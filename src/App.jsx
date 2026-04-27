@@ -256,7 +256,7 @@ export default function App() {
             </div>
             <h2 className="text-2xl font-bold mb-2">암송 완료!</h2>
             <p className="text-slate-500 mb-8 leading-relaxed">
-              모든 구절을 끝까지 마치셨습니다.<br/>말씀이 삶의 힘이 되길 기도합니다.
+              모든 구절을 끝까지 마치셨습니다.<br/>시험 잘 마무리하기를 기도합니다!
             </p>
             <button
               onClick={resetAll}
