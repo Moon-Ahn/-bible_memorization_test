@@ -126,7 +126,7 @@ export default function App() {
           <h1 className="text-2xl font-bold text-indigo-700 flex items-center justify-center gap-2 mb-1">
             <BookOpen className="w-7 h-7" /> 말씀 암송 테스트
           </h1>
-          <p className="text-slate-500 text-sm">정확한 글자 대조 시스템으로 학습하세요.</p>
+          <p className="text-slate-500 text-sm"> 시험 날짜까지 화이팅입니다 </p>
         </header>
 
         {/* Progress Bar */}
