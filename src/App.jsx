@@ -40,47 +40,58 @@ const VERSES = [
   }
 ];
 
+// 정밀 비교를 위한 LCS 알고리즘 기반 Diff 함수
+const getDiff = (target, input) => {
+  const n = target.length;
+  const m = input.length;
+  const dp = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      if (target[i - 1] === input[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  const diff = [];
+  let i = n, j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && target[i - 1] === input[j - 1]) {
+      diff.unshift({ type: 'match', char: target[i - 1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      // 입력에만 있는 글자 (무시하거나 특별 처리 가능)
+      j--;
+    } else if (i > 0 && (j === 0 || dp[i - 1][j] >= dp[i][j - 1])) {
+      // 정답에 있는데 입력에는 없는 글자 (틀린 부분)
+      diff.unshift({ type: 'miss', char: target[i - 1] });
+      i--;
+    }
+  }
+  return diff;
+};
+
 export default function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userInput, setUserInput] = useState("");
   const [isChecked, setIsChecked] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [results, setResults] = useState([]); // Array of { isCorrect: boolean }
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
 
   const currentVerse = VERSES[currentIndex];
 
-  // Logic to compare text and highlight differences
-  const compareText = useMemo(() => {
+  const diffResult = useMemo(() => {
     if (!isChecked) return null;
-
-    const target = currentVerse.text.replace(/\s/g, '');
-    const input = userInput.replace(/\s/g, '');
-
-    const targetChars = currentVerse.text.split('');
-    const inputChars = userInput.split('');
-
-    let resultElements = [];
-    let inputIdx = 0;
-
-    // Simple char-by-char comparison (for visualization)
-    for (let i = 0; i < targetChars.length; i++) {
-      const targetChar = targetChars[i];
-      const inputChar = inputChars[i] || "";
-
-      if (targetChar === inputChar) {
-        resultElements.push(<span key={i} className="text-green-600 font-medium">{targetChar}</span>);
-      } else {
-        resultElements.push(
-          <span key={i} className="bg-red-100 text-red-600 font-bold decoration-wavy underline">
-            {targetChar}
-          </span>
-        );
-      }
-    }
-
-    const isExactMatch = target === input;
-    return { elements: resultElements, isExactMatch };
+    return getDiff(currentVerse.text, userInput);
   }, [isChecked, userInput, currentVerse.text]);
+
+  const isExactMatch = useMemo(() => {
+    if (!diffResult) return false;
+    return !diffResult.some(d => d.type === 'miss');
+  }, [diffResult]);
 
   const handleCheck = () => {
     setIsChecked(true);
@@ -93,9 +104,7 @@ export default function App() {
       setIsChecked(false);
       setShowHint(false);
     } else {
-      // Completed all
-      alert("모든 구절 암송을 완료하셨습니다! 축하합니다.");
-      resetAll();
+      setShowCompleteModal(true);
     }
   };
 
@@ -104,56 +113,56 @@ export default function App() {
     setUserInput("");
     setIsChecked(false);
     setShowHint(false);
+    setShowCompleteModal(false);
   };
 
   const progressPercentage = ((currentIndex + (isChecked ? 1 : 0)) / VERSES.length) * 100;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center py-10 px-4 font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 px-4 font-sans text-slate-800">
       <div className="max-w-2xl w-full">
         {/* Header */}
-        <header className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-indigo-700 flex items-center justify-center gap-2 mb-2">
-            <BookOpen className="w-8 h-8" /> 말씀 암송 테스트
+        <header className="mb-6 text-center">
+          <h1 className="text-2xl font-bold text-indigo-700 flex items-center justify-center gap-2 mb-1">
+            <BookOpen className="w-7 h-7" /> 말씀 암송 테스트
           </h1>
-          <p className="text-slate-500">지정된 말씀을 암송하고 정확도를 확인해보세요.</p>
+          <p className="text-slate-500 text-sm">정확한 글자 대조 시스템으로 학습하세요.</p>
         </header>
 
         {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex justify-between items-end mb-2">
-            <span className="text-sm font-semibold text-indigo-600 uppercase tracking-wider">Progress</span>
-            <span className="text-sm font-medium text-slate-500">{currentIndex + 1} / {VERSES.length} 구절</span>
+        <div className="mb-6">
+          <div className="flex justify-between items-end mb-1.5">
+            <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Progress</span>
+            <span className="text-xs font-medium text-slate-500">{currentIndex + 1} / {VERSES.length}</span>
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden shadow-inner">
             <div
-              className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+              className="bg-indigo-600 h-2 rounded-full transition-all duration-700 ease-out"
               style={{ width: `${progressPercentage}%` }}
             ></div>
           </div>
         </div>
 
-        {/* Test Card */}
-        <div className="bg-white rounded-2xl shadow-xl shadow-indigo-100 border border-slate-100 overflow-hidden transition-all duration-300">
-          <div className="p-6 bg-indigo-600 text-white flex justify-between items-center">
+        {/* Main Card */}
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden">
+          <div className="p-5 bg-indigo-600 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-lg">
+              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 text-sm font-bold">
                 {currentIndex + 1}
-              </div>
-              <h2 className="text-xl font-bold tracking-tight">{currentVerse.ref}</h2>
+              </span>
+              <h2 className="text-lg font-bold">{currentVerse.ref}</h2>
             </div>
             <button
               onClick={() => setShowHint(!showHint)}
               className="p-2 hover:bg-white/10 rounded-full transition-colors"
-              title="힌트 보기"
             >
-              <HelpCircle className="w-6 h-6" />
+              <HelpCircle className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="p-6 md:p-8">
+          <div className="p-6">
             {showHint && (
-              <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-400 text-amber-800 text-sm italic rounded-r-lg animate-in fade-in slide-in-from-top-1">
+              <div className="mb-5 p-3 bg-amber-50 border-l-4 border-amber-400 text-amber-900 text-sm rounded-r-lg animate-in fade-in slide-in-from-top-2">
                 <span className="font-bold">힌트: </span>
                 {currentVerse.text.substring(0, 15)}...
               </div>
@@ -161,99 +170,106 @@ export default function App() {
 
             {!isChecked ? (
               <div className="space-y-4">
-                <label className="block text-sm font-semibold text-slate-400 uppercase tracking-widest ml-1">
-                  암송 내용을 입력하세요
-                </label>
                 <textarea
-                  className="w-full h-40 p-4 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-0 outline-none transition-all text-lg leading-relaxed resize-none bg-slate-50 focus:bg-white"
-                  placeholder="여기에 말씀을 타이핑하세요..."
+                  className="w-full h-48 p-5 border-2 border-slate-100 rounded-2xl focus:border-indigo-400 focus:ring-0 outline-none transition-all text-lg leading-relaxed bg-slate-50 focus:bg-white shadow-inner"
+                  placeholder="여기에 말씀을 입력하세요..."
                   value={userInput}
                   onChange={(e) => setUserInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && e.ctrlKey) handleCheck();
                   }}
                 />
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-xs text-slate-400">Ctrl + Enter 로 제출 가능</span>
-                  <button
-                    disabled={!userInput.trim()}
-                    onClick={handleCheck}
-                    className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold transition-all shadow-lg ${
-                      userInput.trim()
-                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200 active:scale-95'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                    }`}
-                  >
-                    <CheckCircle className="w-5 h-5" /> 제출하기
-                  </button>
-                </div>
+                <button
+                  disabled={!userInput.trim()}
+                  onClick={handleCheck}
+                  className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold transition-all shadow-lg ${
+                    userInput.trim()
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100 active:scale-[0.98]'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  }`}
+                >
+                  <CheckCircle className="w-5 h-5" /> 제출하여 확인하기
+                </button>
+                <p className="text-center text-xs text-slate-400">Ctrl + Enter를 눌러 바로 제출할 수 있습니다.</p>
               </div>
             ) : (
-              <div className="space-y-6 animate-in zoom-in-95 duration-300">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-3">내 입력 결과</h3>
-                  <div className="p-5 bg-slate-50 rounded-xl border border-slate-200 text-lg leading-relaxed min-h-[100px]">
-                    {userInput || <span className="text-slate-300 italic">내용 없음</span>}
+              <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                <section>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                    <div className="w-1 h-3 bg-slate-300 rounded-full"></div> 내 입력 결과
+                  </h3>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-lg leading-relaxed">
+                    {userInput}
                   </div>
-                </div>
+                </section>
 
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-3">정답 확인 및 대조</h3>
-                  <div className="p-5 bg-indigo-50 rounded-xl border border-indigo-100 text-lg leading-relaxed shadow-inner">
-                    {compareText?.elements}
+                <section>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                    <div className="w-1 h-3 bg-indigo-300 rounded-full"></div> 정답 확인 및 대조
+                  </h3>
+                  <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 text-lg leading-relaxed shadow-inner">
+                    {diffResult.map((d, i) => (
+                      <span
+                        key={i}
+                        className={d.type === 'match'
+                          ? "text-green-600 font-medium"
+                          : "bg-red-100 text-red-600 font-bold decoration-wavy underline"
+                        }
+                      >
+                        {d.char}
+                      </span>
+                    ))}
                   </div>
-                  <p className="mt-2 text-xs text-indigo-500">
-                    * <span className="bg-red-100 text-red-600 px-1 font-bold">빨간색 부분</span>은 틀렸거나 빠진 부분입니다.
-                  </p>
-                </div>
+                  <div className="mt-3 flex items-center gap-2 text-[11px] font-medium text-slate-500">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> 일치</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> 틀림/누락</span>
+                    <span className="ml-auto text-indigo-600">*{isExactMatch ? "완벽하게 암송하셨습니다!" : "틀린 부분을 확인해 보세요."}</span>
+                  </div>
+                </section>
 
-                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-slate-100">
+                <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setIsChecked(false)}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-95"
+                    className="flex-1 flex items-center justify-center gap-2 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-[0.98]"
                   >
                     <RefreshCw className="w-5 h-5" /> 다시 시도
                   </button>
                   <button
                     onClick={handleNext}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95"
+                    className="flex-1 flex items-center justify-center gap-2 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all active:scale-[0.98]"
                   >
-                    {currentIndex === VERSES.length - 1 ? "처음으로 돌아가기" : "다음 말씀으로"} <ArrowRight className="w-5 h-5" />
+                    다음 말씀으로 <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>
               </div>
             )}
           </div>
         </div>
-
-        {/* Instruction Footer */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-start gap-3">
-            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600"><BookOpen className="w-5 h-5" /></div>
-            <div>
-              <h4 className="font-bold text-sm mb-1">9개 핵심 구절</h4>
-              <p className="text-xs text-slate-500">엄선된 성경의 보석 같은 구절들을 학습합니다.</p>
-            </div>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-start gap-3">
-            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600"><AlertCircle className="w-5 h-5" /></div>
-            <div>
-              <h4 className="font-bold text-sm mb-1">정밀한 대조</h4>
-              <p className="text-xs text-slate-500">틀린 글자를 정확히 찾아내어 기억을 돕습니다.</p>
-            </div>
-          </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-start gap-3">
-            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600"><ChevronRight className="w-5 h-5" /></div>
-            <div>
-              <h4 className="font-bold text-sm mb-1">순차적 학습</h4>
-              <p className="text-xs text-slate-500">하나씩 정복하며 암송 실력을 쌓아갑니다.</p>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <footer className="mt-16 text-slate-400 text-xs">
-        © 2024 말씀 암송 테스트 Tool - Vercel Ready
+      {/* Complete Modal */}
+      {showCompleteModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-in zoom-in-90 duration-300">
+            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="w-12 h-12" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">암송 완료!</h2>
+            <p className="text-slate-500 mb-8 leading-relaxed">
+              모든 구절을 끝까지 마치셨습니다.<br/>말씀이 삶의 힘이 되길 기도합니다.
+            </p>
+            <button
+              onClick={resetAll}
+              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100"
+            >
+              처음부터 다시 하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      <footer className="mt-auto pt-10 text-slate-400 text-[10px] tracking-widest uppercase">
+        Bible Memory Test Tool
       </footer>
     </div>
   );
